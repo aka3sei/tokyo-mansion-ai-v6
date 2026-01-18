@@ -11,7 +11,7 @@ def load_data_v6():
         # 新しく作成した v6.pkl を指定
         with open('real_estate_ai_v6.pkl', 'rb') as f:
             data = pickle.load(f)
-        # Tierファイルも既存のものを使用（必要に応じて更新してください）
+        # SP列を含むマスターファイルを読み込み
         tier_df = pd.read_csv('chome_master_with_factors.csv').set_index('学習地点')
         return {
             'model': data['model'], 
@@ -50,7 +50,6 @@ if res:
     selected_ward = st.selectbox("1. 区を選択してください", wards_list)
     
     # 選択された区に合致する地点を抽出
-    # 学習時に「東京都」を付与して正規化したため、前方一致で検索
     target_ward = f"東京都{selected_ward}"
     loc_options = [l for l in all_locs if target_ward in l]
 
@@ -58,7 +57,6 @@ if res:
         selected_loc = st.selectbox(
             "2. 地点を選択してください", 
             sorted(loc_options),
-            # 表示から「東京都千代田区」などを消してスッキリさせる
             format_func=lambda x: x.replace(target_ward, "")
         )
         
@@ -72,8 +70,11 @@ if res:
         if st.button("AI精密査定を実行"):
             try:
                 tier_factor = tier_master.loc[selected_loc, 'Tier_Factor']
+                # 追加：SPをCSVから取得
+                sp_count = int(tier_master.loc[selected_loc, 'SP']) if 'SP' in tier_master.columns else "N/A"
             except:
                 tier_factor = 1.000
+                sp_count = "N/A"
 
             # 予測用データの作成
             input_df = pd.DataFrame(np.zeros((1, len(cols))), columns=cols)
@@ -87,7 +88,6 @@ if res:
             raw_price = base_price_val * ratio * area
             std_price = int(raw_price / tier_factor)
             
-            # 市場非効率性 δ (AI Ratio) の表示（カッコなし）
             delta_display = f"{ratio:.4f}"
 
             if 0.80 <= ratio <= 1.20:
@@ -98,7 +98,6 @@ if res:
             p = calculate_5_params(walk_dist, area, base_price_val)
 
             st.markdown("---")
-            # HTMLレポート（カッコなし、アプリアライメント準拠）
             html_report = f'''
             <div style="padding:20px;border:1px solid #e2e8f0;border-radius:12px;font-family:sans-serif;background-color:#ffffff;">
                 <h3 style="color:#0f172a;margin:0;">📍 {selected_loc.replace("東京都","")}</h3>
@@ -136,6 +135,7 @@ if res:
                     <div style="font-family:'Courier New',monospace;font-size:18px;color:{status_color};font-weight:bold;line-height:1.6;">
                         >> ANALYSIS_SEQUENCE_COMPLETE...<br>
                         >> TIER_FACTORS: {tier_factor:.3f}x<br>
+                        >> SP: {sp_count}<br>
                         >> ALPHA_RANK_{p["alpha"]}<br>
                         >> MARKET_INEFFICIENCY_DELTA: {ratio:.4f} EVALUATED
                     </div>
